@@ -30,14 +30,14 @@ class Config:
     PUBLIC_ENDPOINTS = ['/authorizer/ping']
     
     # Variables de entorno para URLs de servicios
-    PROVIDER_SERVICE_URL = os.getenv('PROVIDER_SERVICE_URL', 'http://provider-service:8080')
+    POKEMON_SERVICE_URL = os.getenv('POKEMON_SERVICE_URL', 'https://pokeapi.co')
     
     # Configuración de endpoints seguros (Autorizador)
     SECURED_ENDPOINTS = {
-        '/provider': {
-            'target_url': f"{PROVIDER_SERVICE_URL}/api/provider",
+        '/pokemon': {
+            'target_url': f"{POKEMON_SERVICE_URL}/api/v2/pokemon",
             'method': 'ALL',  # ALL significa todos los métodos HTTP
-            'required_roles': ['Administrador', 'Gestor']
+            'required_roles': ['Administrador']
         }
     }
 
