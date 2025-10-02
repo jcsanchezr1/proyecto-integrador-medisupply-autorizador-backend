@@ -1,0 +1,45 @@
+name: CI MediSupply Authorizer Develop
+
+on:
+  push:
+    branches:
+      - "feature**"
+
+jobs:
+  medisupply-authorizer-test:
+    name: MediSupply Authorizer Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.x
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Install coverage
+        run: pip install coverage
+      - name: Run unit tests with coverage
+        run: |
+          coverage run -m unittest discover -s tests
+          coverage report -m
+          coverage html
+      - name: Check coverage threshold
+        run: |
+          coverage report --fail-under=80
+
+  medisupply-authorizer-merge-develop:
+    name: Merge to develop
+    needs: medisupply-authorizer-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Automerge
+        if: ${{ contains(github.event.head_commit.message, 'FINALIZADO') }}
+        uses: tukasz/direct-merge-action@master
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          source-branch: ${{ github.event.ref }}
+          target-branch: develop

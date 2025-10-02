@@ -1,0 +1,85 @@
+name: CD MediSupply Authorizer Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  # Configuración del proyecto GCP (parametrizable)
+  GCP_PROJECT_ID: soluciones-cloud-2024-02
+  GCP_REGION: us-central1
+  ARTIFACT_REGISTRY: medisupply
+  SERVICE_NAME: medisupply-authorizer-ms
+  IMAGE_NAME: medisupply-authorizer
+  
+  # Configuración de la imagen
+  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_LATEST: latest
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.9
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Run tests
+        run: |
+          coverage run -m unittest discover -s tests
+          coverage report --fail-under=80
+          
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+          
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev
+        
+      - name: Build Docker image
+        run: |
+          docker build --platform=linux/amd64 \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            -t ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_LATEST }} \
+            .
+            
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          docker push ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_LATEST }}
+          
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.GCP_REGION }}-docker.pkg.dev/${{ env.GCP_PROJECT_ID }}/${{ env.ARTIFACT_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} \
+            --region ${{ env.GCP_REGION }} \
+            --platform managed \
+            --set-env-vars HOST="0.0.0.0",DEBUG="false" \
+            --memory 2Gi \
+            --cpu 2 \
+            --min-instances 0 \
+            --max-instances 10 \
+            --port 8080 \
+            --allow-unauthenticated
+            
+      - name: Get service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.GCP_REGION }} --format="value(status.url)")
+          echo "Service deployed at: $SERVICE_URL"
+          echo "Health check: $SERVICE_URL/authorizer/ping"
