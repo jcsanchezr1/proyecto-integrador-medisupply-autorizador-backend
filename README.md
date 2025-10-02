@@ -22,9 +22,6 @@ Sistema de autorización que actúa como proxy/gateway para validar tokens JWT d
 │   │   └── custom_exceptions.py       # Excepciones personalizadas
 │   └── utils/                         # Utilidades
 ├── tests/                             # Tests unitarios
-│   ├── test_app_creation.py          # Tests de creación de app
-│   ├── test_health_controller.py     # Tests del controlador de health
-│   └── test_health_endpoint.py       # Tests del endpoint de health
 ├── app.py                            # Punto de entrada de la aplicación
 ├── requirements.txt                  # Dependencias Python
 ├── Dockerfile                        # Imagen Docker

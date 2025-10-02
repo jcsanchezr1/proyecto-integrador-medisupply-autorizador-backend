@@ -27,9 +27,7 @@ class TestAppCreation(unittest.TestCase):
         app = create_app()
         
         # Verificar que CORS está configurado en la aplicación
-        # Flask-CORS se integra con la app, no cambia el tipo
         self.assertIsNotNone(app)
-        # Verificar que la app tiene las configuraciones de CORS
         self.assertTrue(hasattr(app, 'after_request'))
     
     def test_app_has_secret_key(self):
@@ -38,6 +36,32 @@ class TestAppCreation(unittest.TestCase):
         
         self.assertIn('SECRET_KEY', app.config)
         self.assertIsNotNone(app.config['SECRET_KEY'])
+    
+    def test_app_has_keycloak_config(self):
+        """Prueba que la aplicación tiene configuración de Keycloak"""
+        app = create_app()
+        
+        self.assertIn('KEYCLOAK_SERVER_URL', app.config)
+        self.assertIn('KEYCLOAK_REALM', app.config)
+        self.assertIn('KEYCLOAK_CLIENT_ID', app.config)
+        self.assertIn('JWT_ALGORITHM', app.config)
+        self.assertIn('JWT_ISSUER', app.config)
+    
+    def test_app_has_secured_endpoints_config(self):
+        """Prueba que la aplicación tiene configuración de endpoints seguros"""
+        app = create_app()
+        
+        self.assertIn('SECURED_ENDPOINTS', app.config)
+        self.assertIsInstance(app.config['SECURED_ENDPOINTS'], dict)
+        self.assertIn('/pokemon', app.config['SECURED_ENDPOINTS'])
+    
+    def test_app_has_public_endpoints_config(self):
+        """Prueba que la aplicación tiene configuración de endpoints públicos"""
+        app = create_app()
+        
+        self.assertIn('PUBLIC_ENDPOINTS', app.config)
+        self.assertIsInstance(app.config['PUBLIC_ENDPOINTS'], list)
+        self.assertIn('/authorizer/ping', app.config['PUBLIC_ENDPOINTS'])
 
 
 if __name__ == '__main__':

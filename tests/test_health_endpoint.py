@@ -25,7 +25,7 @@ class TestHealthEndpoint(unittest.TestCase):
         response = self.client.get('/authorizer/ping')
         
         self.assertEqual(response.status_code, 200)
-        # Flask-RESTful retorna JSON, así que verificamos el contenido JSON
+        # El endpoint retorna JSON con "pong"
         self.assertEqual(response.get_json(), "pong")
     
     def test_health_endpoint_returns_json(self):
