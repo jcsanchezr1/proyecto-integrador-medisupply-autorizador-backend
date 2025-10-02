@@ -41,17 +41,20 @@ def create_app():
 def configure_routes(app):
     """Configura las rutas de la aplicación"""
     from .controllers.authorizer_controller import (
-        HealthCheckView, 
-        AuthHealthView, 
-        ProviderView
+        AuthorizerView,
+        AuthorizerHealthView
     )
     
     api = Api(app)
     
     # Endpoints públicos (no requieren autenticación)
-    api.add_resource(HealthCheckView, '/authorizer/ping')
-    api.add_resource(AuthHealthView, '/auth/health')
+    api.add_resource(AuthorizerHealthView, '/authorizer/ping')
     
-    
-    # Endpoints protegidos (requieren autenticación y roles específicos)
-    api.add_resource(ProviderView, '/provider')
+    # Autorizador dinámico - captura todas las rutas configuradas
+    secured_endpoints = app.config.get('SECURED_ENDPOINTS', {})
+    for i, endpoint_path in enumerate(secured_endpoints.keys()):
+        # Crear una clase dinámica para cada endpoint para evitar conflictos
+        class_name = f"AuthorizerView{i}"
+        dynamic_view = type(class_name, (AuthorizerView,), {})
+        # Usar un patrón que capture cualquier ruta que comience con el endpoint
+        api.add_resource(dynamic_view, f"{endpoint_path}", f"{endpoint_path}/<path:path>")

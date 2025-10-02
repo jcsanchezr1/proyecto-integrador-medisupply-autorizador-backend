@@ -27,11 +27,18 @@ class Config:
     JWT_ISSUER = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}"
     
     # Endpoints que no requieren autenticación
-    PUBLIC_ENDPOINTS = ['/authorizer/ping', '/health']
+    PUBLIC_ENDPOINTS = ['/authorizer/ping']
     
-    # Configuración de roles por endpoint
-    ENDPOINT_ROLES = {
-        'POST /provider': ['Administrador'],
+    # Variables de entorno para URLs de servicios
+    PROVIDER_SERVICE_URL = os.getenv('PROVIDER_SERVICE_URL', 'http://provider-service:8080')
+    
+    # Configuración de endpoints seguros (Autorizador)
+    SECURED_ENDPOINTS = {
+        '/provider': {
+            'target_url': f"{PROVIDER_SERVICE_URL}/api/provider",
+            'method': 'ALL',  # ALL significa todos los métodos HTTP
+            'required_roles': ['Administrador', 'Gestor']
+        }
     }
 
 

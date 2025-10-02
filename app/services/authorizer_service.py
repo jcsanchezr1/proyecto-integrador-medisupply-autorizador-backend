@@ -1,17 +1,20 @@
 """
-Servicio de autenticación con Keycloak
+Servicio del Autorizador para redirigir peticiones a servicios de destino
+Incluye funcionalidad de autenticación con Keycloak
 """
-import jwt
 import requests
-from typing import Dict, List, Optional
-from flask import current_app
 import logging
+import jwt
+from typing import Dict, Optional, Tuple, List
+from flask import request, g, current_app
+import base64
+import json
 
 logger = logging.getLogger(__name__)
 
 
-class KeycloakAuthService:
-    """Servicio para autenticación con Keycloak"""
+class AuthorizerService:
+    """Servicio para manejar el proxy/autorizador de peticiones con autenticación Keycloak"""
     
     def __init__(self):
         self.server_url = current_app.config.get('KEYCLOAK_SERVER_URL')
@@ -21,6 +24,152 @@ class KeycloakAuthService:
         self.jwt_algorithm = current_app.config.get('JWT_ALGORITHM')
         self._public_key = None
     
+    def validate_request(self, endpoint_config: Dict, user_roles: list) -> Tuple[bool, str]:
+        """
+        Valida si el usuario tiene permisos para acceder al endpoint
+        
+        Args:
+            endpoint_config: Configuración del endpoint desde settings
+            user_roles: Roles del usuario autenticado
+            
+        Returns:
+            Tuple (is_valid, error_message)
+        """
+        required_roles = endpoint_config.get('required_roles', [])
+        
+        if not required_roles:
+            return True, ""
+        
+        if not self.has_required_role(user_roles, required_roles):
+            return False, f"Acceso denegado. Roles requeridos: {', '.join(required_roles)}"
+        
+        return True, ""
+    
+    def forward_request(self, endpoint_config: Dict, path: str) -> Tuple[Dict, int]:
+        """
+        Redirige la petición al servicio de destino
+        
+        Args:
+            endpoint_config: Configuración del endpoint
+            path: Ruta específica después del endpoint base
+            
+        Returns:
+            Tuple (response_data, status_code)
+        """
+        try:
+            target_url = endpoint_config['target_url']
+            method = request.method
+            
+            # Construir URL completa
+            if path and path != '/':
+                full_url = f"{target_url.rstrip('/')}/{path.lstrip('/')}"
+            else:
+                full_url = target_url
+            
+            # Preparar headers
+            headers = dict(request.headers)
+            
+            # Remover headers que no deben ser reenviados
+            headers_to_remove = ['Host', 'Content-Length']
+            for header in headers_to_remove:
+                headers.pop(header, None)
+            
+            # Agregar información del usuario autenticado
+            if hasattr(g, 'user') and g.user:
+                headers['X-User-ID'] = g.user.get('user_id', '')
+                headers['X-Username'] = g.user.get('username', '')
+                headers['X-User-Roles'] = ','.join(g.user.get('roles', []))
+            
+            # Preparar datos de la petición
+            request_data = None
+            if request.is_json:
+                request_data = request.get_json()
+            elif request.form:
+                request_data = request.form.to_dict()
+            elif request.data:
+                request_data = request.data
+            
+            # Realizar petición al servicio de destino
+            response = requests.request(
+                method=method,
+                url=full_url,
+                headers=headers,
+                json=request_data if request.is_json else None,
+                data=request_data if not request.is_json else None,
+                params=request.args,
+                timeout=30
+            )
+            
+            # Preparar respuesta
+            response_data = {}
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {'data': response.text}
+            
+            logger.info(f"Authorizer: {method} {full_url} -> {response.status_code}")
+            
+            return response_data, response.status_code
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout al conectar con {target_url}")
+            return {
+                'error': 'Timeout del servicio de destino',
+                'message': 'El servicio no respondió en el tiempo esperado'
+            }, 504
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Error de conexión con {target_url}")
+            return {
+                'error': 'Servicio no disponible',
+                'message': 'No se pudo conectar con el servicio de destino'
+            }, 503
+            
+        except Exception as e:
+            logger.error(f"Error inesperado en autorizador: {e}")
+            return {
+                'error': 'Error interno del autorizador',
+                'message': 'Error inesperado al procesar la petición'
+            }, 500
+    
+    def get_endpoint_config(self, path: str) -> Optional[Dict]:
+        """
+        Obtiene la configuración del endpoint basado en la ruta
+        
+        Args:
+            path: Ruta de la petición
+            
+        Returns:
+            Configuración del endpoint o None si no existe
+        """
+        from flask import current_app
+        
+        secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
+        
+        # Buscar coincidencia exacta primero
+        if path in secured_endpoints:
+            return secured_endpoints[path]
+        
+        # Buscar coincidencia por prefijo
+        for endpoint_path, config in secured_endpoints.items():
+            if path.startswith(endpoint_path):
+                return config
+        
+        return None
+    
+    def is_authorizer_endpoint(self, path: str) -> bool:
+        """
+        Verifica si la ruta es un endpoint del autorizador
+        
+        Args:
+            path: Ruta de la petición
+            
+        Returns:
+            True si es un endpoint del autorizador
+        """
+        return self.get_endpoint_config(path) is not None
+    
+    # Métodos de autenticación con Keycloak
     def get_public_key(self, kid: str = None) -> Optional[str]:
         """Obtiene la clave pública de Keycloak para validar JWT"""
         try:
@@ -58,7 +207,6 @@ class KeycloakAuthService:
         """Convierte una clave JWK a formato PEM"""
         from cryptography.hazmat.primitives import serialization
         from cryptography.hazmat.primitives.asymmetric import rsa
-        import base64
         
         # Extraer componentes de la clave RSA
         n = base64.urlsafe_b64decode(jwk['n'] + '==')
@@ -91,10 +239,6 @@ class KeycloakAuthService:
         """
         try:
             # Extraer el header del token para obtener el kid
-            import base64
-            import json
-            
-            # Decodificar el header del token
             header_data = token.split('.')[0]
             # Agregar padding si es necesario
             header_data += '=' * (4 - len(header_data) % 4)
@@ -133,7 +277,6 @@ class KeycloakAuthService:
             return None
         except jwt.InvalidTokenError as e:
             logger.warning(f"Token inválido: {e}")
-            logger.warning(f"Token recibido: {token}...")
             return None
         except Exception as e:
             logger.error(f"Error inesperado al validar token: {e}")
