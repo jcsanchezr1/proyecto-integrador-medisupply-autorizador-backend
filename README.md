@@ -4,38 +4,52 @@ Sistema de autorización backend para el proyecto integrador MediSupply que vali
 
 ## Arquitectura
 
-Sistema de autorización con middleware que intercepta todas las peticiones:
+Sistema de autorización que actúa como proxy/gateway para validar tokens JWT de Keycloak y controlar el acceso basado en roles:
 
 ```
 ├── app/
-│   ├── config/              # Configuración de Keycloak y roles
-│   ├── controllers/         # Controladores REST
-│   │   └── authorizer_controller.py  # Todos los endpoints del autorizador
-│   ├── services/            # Lógica de negocio
-│   │   └── auth_service.py           # Servicio de autenticación Keycloak
-│   ├── middleware/          # Middleware de autorización
-│   │   └── auth_middleware.py        # Interceptor de peticiones
-│   ├── repositories/        # Acceso a datos (estructura)
-│   ├── models/              # Modelos de datos (estructura)
-│   ├── exceptions/          # Excepciones (estructura)
-│   └── utils/               # Utilidades (estructura)
-├── tests/                   # Tests (estructura)
-├── app.py                  # Punto de entrada
-├── requirements.txt        # Dependencias incluyendo PyJWT
-├── Dockerfile             # Containerización
-├── docker-compose.yml     # Orquestación
-└── README.md              # Documentación
+│   ├── config/                        # Configuración de la aplicación
+│   │   └── settings.py                # Configuración de Keycloak, endpoints y roles
+│   ├── controllers/                   # Controladores REST
+│   │   ├── base_controller.py         # Controlador base
+│   │   └── authorizer_controller.py   # Controlador principal del autorizador
+│   ├── services/                      # Lógica de negocio
+│   │   ├── base_service.py            # Servicio base
+│   │   └── authorizer_service.py      # Servicio de autorización y proxy
+│   ├── middleware/                    # Middleware de autorización
+│   │   └── auth_middleware.py         # Middleware para endpoints públicos
+│   ├── exceptions/                    # Manejo de excepciones
+│   │   └── custom_exceptions.py       # Excepciones personalizadas
+│   └── utils/                         # Utilidades
+├── tests/                             # Tests unitarios
+│   ├── test_app_creation.py          # Tests de creación de app
+│   ├── test_health_controller.py     # Tests del controlador de health
+│   └── test_health_endpoint.py       # Tests del endpoint de health
+├── app.py                            # Punto de entrada de la aplicación
+├── requirements.txt                  # Dependencias Python
+├── Dockerfile                        # Imagen Docker
+├── docker-compose.yml               # Orquestación con Docker Compose
+└── README.md                        # Documentación del proyecto
 ```
+
+### Flujo de Autorización
+
+1. **Middleware** intercepta peticiones y verifica si son endpoints públicos
+2. **Controlador** valida tokens JWT con Keycloak
+3. **Servicio** extrae roles del usuario y valida permisos
+4. **Proxy** redirige peticiones autorizadas a servicios de destino
+5. **Respuesta** devuelve resultado del servicio o error de autorización
 
 ## Características
 
-- **Autenticación JWT**: Validación de tokens de Keycloak
-- **Autorización por Roles**: Control de acceso basado en roles de usuario
-- **Middleware Global**: Intercepta todas las peticiones automáticamente
+- **Autenticación JWT**: Validación de tokens de Keycloak con claves públicas RSA
+- **Autorización por Roles**: Control de acceso basado en roles de usuario (realm y cliente)
+- **Endpoints Configurables**: Endpoints seguros con roles requeridos definidos en configuración
 - **Endpoints Públicos**: Health checks sin autenticación
-- **Logging**: Registro detallado de peticiones y validaciones
-- **Docker**: Containerización para local y Cloud Run
-- **CORS**: Habilitado para desarrollo
+- **Logging Detallado**: Registro de validaciones, roles y errores para debugging
+- **Manejo de Errores**: Códigos de estado HTTP apropiados (401 para autenticación, 403 para autorización)
+- **Docker**: Containerización completa para desarrollo y producción
+- **CORS**: Habilitado para desarrollo frontend
 
 ## Tecnologías
 
@@ -71,20 +85,34 @@ Sistema de autorización con middleware que intercepta todas las peticiones:
 
 ## Endpoints
 
-### Health Check
-- `GET /authorizer/ping` - Ping simple
+### Endpoints Públicos
+- `GET /authorizer/ping` - Health check del autorizador (sin autenticación)
 
-## Respuesta del Health Check
+### Endpoints Seguros (Configurables)
+Los endpoints seguros se configuran en `app/config/settings.py` bajo `SECURED_ENDPOINTS`:
 
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T12:00:00.000Z",
-  "service": "MediSupply Authorizer Backend",
-  "version": "1.0.0",
-  "environment": "development"
+- `GET/POST/PUT/DELETE /pokemon` - Requiere rol "Administrador"
+  - Redirige a: `https://pokeapi.co/api/v2/pokemon`
+
+### Configuración de Endpoints
+```python
+SECURED_ENDPOINTS = {
+    '/pokemon': {
+        'target_url': 'https://pokeapi.co/api/v2/pokemon',
+        'method': 'ALL',
+        'required_roles': ['Administrador']
+    }
 }
 ```
+
+### Códigos de Respuesta
+- **200**: Petición exitosa
+- **401**: Token inválido, expirado o no proporcionado
+- **403**: Token válido pero sin permisos suficientes
+- **404**: Endpoint no encontrado
+- **500**: Error interno del servidor
+- **503**: Servicio de destino no disponible
+- **504**: Timeout del servicio de destino
 
 ## Cloud Run
 
