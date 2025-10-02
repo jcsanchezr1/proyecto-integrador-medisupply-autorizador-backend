@@ -1,40 +1,48 @@
 # MediSupply Authorizer Backend
 
-Sistema de autenticación backend para el proyecto integrador MediSupply - Versión simplificada.
+Sistema de autorización backend para el proyecto integrador MediSupply que valida tokens JWT de Keycloak y controla el acceso basado en roles.
 
 ## Arquitectura
 
-Estructura básica preparada para escalar:
+Sistema de autorización con middleware que intercepta todas las peticiones:
 
 ```
 ├── app/
-│   ├── config/          # Configuración
-│   ├── controllers/     # Controladores REST
-│   │   └── health_controller.py  # Healthcheck funcional
-│   ├── services/        # Lógica de negocio (estructura)
-│   ├── repositories/    # Acceso a datos (estructura)
-│   ├── models/          # Modelos de datos (estructura)
-│   ├── exceptions/      # Excepciones (estructura)
-│   └── utils/           # Utilidades (estructura)
-├── tests/               # Tests (estructura)
-├── app.py              # Punto de entrada
-├── requirements.txt    # Mismas versiones del proyecto sample
-├── Dockerfile         # Containerización
-├── docker-compose.yml # Orquestación
-└── README.md          # Documentación
+│   ├── config/              # Configuración de Keycloak y roles
+│   ├── controllers/         # Controladores REST
+│   │   └── authorizer_controller.py  # Todos los endpoints del autorizador
+│   ├── services/            # Lógica de negocio
+│   │   └── auth_service.py           # Servicio de autenticación Keycloak
+│   ├── middleware/          # Middleware de autorización
+│   │   └── auth_middleware.py        # Interceptor de peticiones
+│   ├── repositories/        # Acceso a datos (estructura)
+│   ├── models/              # Modelos de datos (estructura)
+│   ├── exceptions/          # Excepciones (estructura)
+│   └── utils/               # Utilidades (estructura)
+├── tests/                   # Tests (estructura)
+├── app.py                  # Punto de entrada
+├── requirements.txt        # Dependencias incluyendo PyJWT
+├── Dockerfile             # Containerización
+├── docker-compose.yml     # Orquestación
+└── README.md              # Documentación
 ```
 
 ## Características
 
-- **Health Check**: Endpoint de monitoreo del servicio
+- **Autenticación JWT**: Validación de tokens de Keycloak
+- **Autorización por Roles**: Control de acceso basado en roles de usuario
+- **Middleware Global**: Intercepta todas las peticiones automáticamente
+- **Endpoints Públicos**: Health checks sin autenticación
+- **Logging**: Registro detallado de peticiones y validaciones
 - **Docker**: Containerización para local y Cloud Run
-- **Flask**: Framework web minimalista
 - **CORS**: Habilitado para desarrollo
 
 ## Tecnologías
 
 - Python 3.9
 - Flask 3.0.3
+- PyJWT 2.8.0 (validación JWT)
+- Cryptography 42.0.8 (claves RSA)
 - Gunicorn 21.2.0
 - Docker
 
@@ -64,8 +72,7 @@ Estructura básica preparada para escalar:
 ## Endpoints
 
 ### Health Check
-- `GET /health` - Estado del servicio
-- `GET /ping` - Ping simple
+- `GET /authorizer/ping` - Ping simple
 
 ## Respuesta del Health Check
 
@@ -99,19 +106,10 @@ Para desplegar en Google Cloud Run:
      --image gcr.io/PROJECT_ID/medisupply-authorizer \
      --platform managed \
      --region us-central1 \
-     --allow-unauthenticated
+     --allow-unauthenticated \
+     --set-env-vars KEYCLOAK_SERVER_URL=https://your-keycloak.com,KEYCLOAK_REALM=medisupply-realm,KEYCLOAK_CLIENT_ID=medisupply-app
    ```
 
-## Variables de Entorno
+## Logs
 
-- `FLASK_ENV`: Entorno (development/production)
-- `PORT`: Puerto del servicio (default: 8081)
-- `HOST`: Host del servicio (default: 0.0.0.0)
-- `DEBUG`: Modo debug (default: True)
-
-## Próximos Pasos
-
-1. Implementar autenticación 
-2. Agregar base de datos
-3. Implementar endpoints de creaciòn de usuarios
-4. Agregar validaciones en e proyecto 3.
+La aplicación registra todas las peticiones y validaciones en los logs para facilitar el debugging.

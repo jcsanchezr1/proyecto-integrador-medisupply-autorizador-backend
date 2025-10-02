@@ -16,6 +16,23 @@ class Config:
     # Configuración de la aplicación
     APP_NAME = 'MediSupply Authorizer Backend'
     APP_VERSION = '1.0.0'
+    
+    # Configuración de Keycloak
+    KEYCLOAK_SERVER_URL = os.getenv('KEYCLOAK_SERVER_URL', 'http://localhost:8080')
+    KEYCLOAK_REALM = os.getenv('KEYCLOAK_REALM', 'medisupply-realm')
+    KEYCLOAK_CLIENT_ID = os.getenv('KEYCLOAK_CLIENT_ID', 'medisupply-client')
+    
+    # Configuración de JWT
+    JWT_ALGORITHM = 'RS256'
+    JWT_ISSUER = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}"
+    
+    # Endpoints que no requieren autenticación
+    PUBLIC_ENDPOINTS = ['/authorizer/ping', '/health']
+    
+    # Configuración de roles por endpoint
+    ENDPOINT_ROLES = {
+        'POST /provider': ['Administrador'],
+    }
 
 
 class DevelopmentConfig(Config):
