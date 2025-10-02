@@ -18,11 +18,7 @@ class HealthCheckView(Resource):
         Health check básico del servicio
         GET /authorizer/ping
         """
-        return {
-            "status": "ok",
-            "message": "pong",
-            "service": "MediSupply Authorizer Backend"
-        }, 200
+        return "pong", 200
 
 
 class AuthHealthView(Resource):
