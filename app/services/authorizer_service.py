@@ -261,7 +261,8 @@ class AuthorizerService:
                     "verify_signature": True,
                     "verify_exp": True,
                     "verify_iat": True,
-                    "verify_iss": False 
+                    "verify_iss": False,
+                    "verify_aud": False
                 }
             )
             
@@ -270,6 +271,19 @@ class AuthorizerService:
                 logger.warning(f"Token no es para el cliente correcto. Esperado: {self.client_id}, Obtenido: {payload.get('azp')}")
                 return None
             
+            if 'aud' in payload:
+                audience = payload['aud']
+                valid_audiences = [self.client_id, 'account', 'medisupply-app']  # Audiences válidos
+                
+                if isinstance(audience, list):
+                    if not any(aud in valid_audiences for aud in audience):
+                        logger.warning(f"Token audience no incluye ningún audience válido. Esperado uno de: {valid_audiences}, Obtenido: {audience}")
+                        return None
+                elif audience not in valid_audiences:
+                    logger.warning(f"Token audience no es válido. Esperado uno de: {valid_audiences}, Obtenido: {audience}")
+                    return None
+            
+            logger.info(f"Token validado exitosamente para usuario: {payload.get('preferred_username', 'unknown')}")
             return payload
             
         except jwt.ExpiredSignatureError:
@@ -296,7 +310,8 @@ class AuthorizerService:
         
         # Obtener roles del realm
         if 'realm_access' in token_payload and 'roles' in token_payload['realm_access']:
-            roles.extend(token_payload['realm_access']['roles'])
+            realm_roles = token_payload['realm_access']['roles']
+            roles.extend(realm_roles)
         
         # Obtener roles específicos del cliente
         if 'resource_access' in token_payload and self.client_id in token_payload['resource_access']:
