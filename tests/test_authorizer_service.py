@@ -265,19 +265,22 @@ class TestAuthorizerService(unittest.TestCase):
     def test_validate_token_with_invalid_token_returns_none(self):
         """Prueba que validate_token retorna None con token inválido"""
         with self.app.app_context():
-            result = self.service.validate_token('invalid-token')
+            with patch('app.services.authorizer_service.AuthorizerService.get_public_key', return_value='FAKE_PEM'):
+                result = self.service.validate_token('invalid-token')
             self.assertIsNone(result)
     
     def test_validate_token_with_empty_token_returns_none(self):
         """Prueba que validate_token retorna None con token vacío"""
         with self.app.app_context():
-            result = self.service.validate_token('')
+            with patch('app.services.authorizer_service.AuthorizerService.get_public_key', return_value='FAKE_PEM'):
+                result = self.service.validate_token('')
             self.assertIsNone(result)
     
     def test_validate_token_with_none_returns_none(self):
         """Prueba que validate_token retorna None con token None"""
         with self.app.app_context():
-            result = self.service.validate_token(None)
+            with patch('app.services.authorizer_service.AuthorizerService.get_public_key', return_value='FAKE_PEM'):
+                result = self.service.validate_token(None)
             self.assertIsNone(result)
     
     def test_forward_request_method_exists(self):
