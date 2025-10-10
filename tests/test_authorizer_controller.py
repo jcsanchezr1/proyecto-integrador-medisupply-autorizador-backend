@@ -97,6 +97,101 @@ class TestAuthorizerController(unittest.TestCase):
             
             mock_handle.assert_called_once_with(None)
             self.assertEqual(result, ({'data': 'test'}, 200))
+    
+    def test_handle_options_request_secured_endpoint(self):
+        """Prueba que _handle_options_request maneja endpoints seguros correctamente"""
+        with self.app.test_request_context('/pokemon'):
+            with patch('flask.current_app') as mock_app:
+                mock_app.config = Mock()
+                mock_app.config.get.side_effect = lambda key, default=None: {
+                    'SECURED_ENDPOINTS': {
+                        '/pokemon': {'target_url': 'http://example.com', 'method': 'ALL'},
+                        '/auth/admin/users': {'target_url': 'http://example.com', 'method': 'POST'}
+                    },
+                    'PUBLIC_EXTERNAL_ENDPOINTS': {}
+                }.get(key, default)
+                
+                result = self.controller._handle_options_request('/pokemon')
+                
+                # Debería retornar una respuesta con headers CORS
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual(result.get_data(as_text=True), '')  # empty body
+                self.assertEqual(result.headers.get('Access-Control-Allow-Origin'), '*')
+    
+    def test_handle_options_request_public_endpoint(self):
+        """Prueba que _handle_options_request maneja endpoints públicos correctamente"""
+        with self.app.test_request_context('/auth/token'):
+            with patch('flask.current_app') as mock_app:
+                mock_app.config = Mock()
+                mock_app.config.get.side_effect = lambda key, default=None: {
+                    'SECURED_ENDPOINTS': {},
+                    'PUBLIC_EXTERNAL_ENDPOINTS': {
+                        '/auth/token': {'target_url': 'http://example.com', 'method': 'POST'}
+                    }
+                }.get(key, default)
+                
+                result = self.controller._handle_options_request('/auth/token')
+                
+                # Debería retornar una respuesta con headers CORS
+                self.assertEqual(result.status_code, 200)
+                self.assertEqual(result.get_data(as_text=True), '')  # empty body
+                self.assertEqual(result.headers.get('Access-Control-Allow-Origin'), '*')
+    
+    def test_handle_options_request_unknown_endpoint(self):
+        """Prueba que _handle_options_request retorna 404 para endpoints desconocidos"""
+        with self.app.test_request_context('/unknown'):
+            with patch('flask.current_app') as mock_app:
+                mock_app.config = Mock()
+                mock_app.config.get.return_value = {}
+                
+                result = self.controller._handle_options_request('/unknown')
+                
+                # Debería retornar 404
+                self.assertEqual(result[1], 404)
+                self.assertIn('error', result[0])
+                self.assertIn('Endpoint no encontrado', result[0]['error'])
+    
+    def test_handle_options_request_cors_headers(self):
+        """Prueba que _handle_options_request incluye todos los headers CORS necesarios"""
+        with self.app.test_request_context('/pokemon'):
+            with patch('flask.current_app') as mock_app:
+                mock_app.config = Mock()
+                mock_app.config.get.side_effect = lambda key, default=None: {
+                    'SECURED_ENDPOINTS': {
+                        '/pokemon': {'target_url': 'http://example.com', 'method': 'ALL'}
+                    },
+                    'PUBLIC_EXTERNAL_ENDPOINTS': {}
+                }.get(key, default)
+                
+                result = self.controller._handle_options_request('/pokemon')
+                
+                # Verificar headers CORS
+                self.assertEqual(result.headers.get('Access-Control-Allow-Origin'), '*')
+                self.assertIn('GET, POST, PUT, DELETE, PATCH, OPTIONS', 
+                             result.headers.get('Access-Control-Allow-Methods'))
+                self.assertIn('Content-Type', result.headers.get('Access-Control-Allow-Headers'))
+                self.assertIn('Authorization', result.headers.get('Access-Control-Allow-Headers'))
+                self.assertEqual(result.headers.get('Access-Control-Max-Age'), '3600')
+    
+    def test_handle_options_request_with_custom_headers(self):
+        """Prueba que _handle_options_request maneja headers personalizados en la petición"""
+        with self.app.test_request_context('/pokemon', headers={'Access-Control-Request-Headers': 'Content-Type, Authorization, X-Custom-Header'}):
+            with patch('flask.current_app') as mock_app:
+                mock_app.config = Mock()
+                mock_app.config.get.side_effect = lambda key, default=None: {
+                    'SECURED_ENDPOINTS': {
+                        '/pokemon': {'target_url': 'http://example.com', 'method': 'ALL'}
+                    },
+                    'PUBLIC_EXTERNAL_ENDPOINTS': {}
+                }.get(key, default)
+                
+                result = self.controller._handle_options_request('/pokemon')
+                
+                # Verificar que los headers personalizados se incluyen
+                allowed_headers = result.headers.get('Access-Control-Allow-Headers')
+                self.assertIn('Content-Type', allowed_headers)
+                self.assertIn('Authorization', allowed_headers)
+                self.assertIn('X-Custom-Header', allowed_headers)
 
 
 if __name__ == '__main__':

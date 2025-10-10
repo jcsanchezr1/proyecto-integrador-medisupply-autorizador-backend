@@ -23,8 +23,12 @@ def create_app():
     config = get_config()
     app.config.from_object(config)
     
-    # Configurar CORS
-    cors = CORS(app)
+    # Configurar CORS con opciones específicas para todos los endpoints
+    cors = CORS(app, 
+                origins="*",
+                methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+                allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+                supports_credentials=False)
     
     # Configurar middleware de autorización
     auth_middleware = AuthMiddleware(app)

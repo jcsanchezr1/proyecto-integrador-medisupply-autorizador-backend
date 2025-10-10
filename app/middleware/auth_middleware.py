@@ -35,9 +35,11 @@ class AuthMiddleware:
         secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
         for endpoint_path, endpoint_config in secured_endpoints.items():
             if request.path.startswith(endpoint_path):
-                # Verificar si el método HTTP coincide
+                # Verificar si el método HTTP coincide (incluyendo OPTIONS)
                 configured_method = endpoint_config.get('method', 'ALL')
-                if configured_method == 'ALL' or configured_method.upper() == request.method.upper():
+                if (configured_method == 'ALL' or 
+                    configured_method.upper() == request.method.upper() or 
+                    request.method == 'OPTIONS'):
                     # Si es un endpoint seguro, la validación se hace en el controlador
                     return None
         
@@ -45,9 +47,11 @@ class AuthMiddleware:
         public_external_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
         for endpoint_path, endpoint_config in public_external_endpoints.items():
             if request.path.startswith(endpoint_path):
-                # Verificar si el método HTTP coincide
+                # Verificar si el método HTTP coincide (incluyendo OPTIONS)
                 configured_method = endpoint_config.get('method', 'ALL')
-                if configured_method == 'ALL' or configured_method.upper() == request.method.upper():
+                if (configured_method == 'ALL' or 
+                    configured_method.upper() == request.method.upper() or 
+                    request.method == 'OPTIONS'):
                     # Si es un endpoint público externo, la redirección se hace en el controlador
                     return None
         
