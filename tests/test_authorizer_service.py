@@ -28,6 +28,7 @@ class TestAuthorizerService(unittest.TestCase):
         
         with self.app.app_context():
             self.service = AuthorizerService()
+            self.service.client_id = 'medisupply-client'
     
     def test_has_required_role_with_valid_role(self):
         """Prueba que has_required_role retorna True cuando el usuario tiene el rol requerido"""
