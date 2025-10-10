@@ -70,7 +70,7 @@ class AuthorizerService:
             headers = dict(request.headers)
             
             # Remover headers que no deben ser reenviados
-            headers_to_remove = ['Host', 'Content-Length']
+            headers_to_remove = ['Host', 'Content-Length', 'Content-Type']
             for header in headers_to_remove:
                 headers.pop(header, None)
             
@@ -81,21 +81,19 @@ class AuthorizerService:
                 headers['X-User-Roles'] = ','.join(g.user.get('roles', []))
             
             # Preparar datos de la petición
-            request_data = None
-            if request.is_json:
-                request_data = request.get_json()
-            elif request.form:
-                request_data = request.form.to_dict()
-            elif request.data:
-                request_data = request.data
+            request_data, files = self._prepare_request_data()
+            
+            # Determinar si enviar como JSON o form-data (asegurar booleano)
+            is_json_request = bool(request.is_json or (not files and request_data is not None))
             
             # Realizar petición al servicio de destino
             response = requests.request(
                 method=method,
                 url=full_url,
                 headers=headers,
-                json=request_data if request.is_json else None,
-                data=request_data if not request.is_json else None,
+                json=request_data if is_json_request else None,
+                data=request_data if not is_json_request else None,
+                files=files if files else None,
                 params=request.args,
                 timeout=30
             )
@@ -132,12 +130,13 @@ class AuthorizerService:
                 'message': 'Error inesperado al procesar la petición'
             }, 500
     
-    def get_endpoint_config(self, path: str) -> Optional[Dict]:
+    def get_endpoint_config(self, path: str, method: str = None) -> Optional[Dict]:
         """
-        Obtiene la configuración del endpoint basado en la ruta
+        Obtiene la configuración del endpoint basado en la ruta y método HTTP
         
         Args:
             path: Ruta de la petición
+            method: Método HTTP de la petición
             
         Returns:
             Configuración del endpoint o None si no existe
@@ -148,26 +147,247 @@ class AuthorizerService:
         
         # Buscar coincidencia exacta primero
         if path in secured_endpoints:
-            return secured_endpoints[path]
+            config = secured_endpoints[path]
+            # Verificar si el método HTTP coincide
+            if self._method_matches(config.get('method', 'ALL'), method):
+                return config
         
         # Buscar coincidencia por prefijo
         for endpoint_path, config in secured_endpoints.items():
             if path.startswith(endpoint_path):
-                return config
+                # Verificar si el método HTTP coincide
+                if self._method_matches(config.get('method', 'ALL'), method):
+                    return config
         
         return None
     
-    def is_authorizer_endpoint(self, path: str) -> bool:
+    def get_public_endpoint_config(self, path: str, method: str = None) -> Optional[Dict]:
+        """
+        Obtiene la configuración del endpoint público basado en la ruta y método HTTP
+        
+        Args:
+            path: Ruta de la petición
+            method: Método HTTP de la petición
+            
+        Returns:
+            Configuración del endpoint público o None si no existe
+        """
+        from flask import current_app
+        
+        public_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
+        
+        # Buscar coincidencia exacta primero
+        if path in public_endpoints:
+            config = public_endpoints[path]
+            # Verificar si el método HTTP coincide
+            if self._method_matches(config.get('method', 'ALL'), method):
+                return config
+        
+        # Buscar coincidencia por prefijo
+        for endpoint_path, config in public_endpoints.items():
+            if path.startswith(endpoint_path):
+                # Verificar si el método HTTP coincide
+                if self._method_matches(config.get('method', 'ALL'), method):
+                    return config
+        
+        return None
+    
+    def is_authorizer_endpoint(self, path: str, method: str = None) -> bool:
         """
         Verifica si la ruta es un endpoint del autorizador
         
         Args:
             path: Ruta de la petición
+            method: Método HTTP de la petición
             
         Returns:
             True si es un endpoint del autorizador
         """
-        return self.get_endpoint_config(path) is not None
+        return self.get_endpoint_config(path, method) is not None
+    
+    def is_public_endpoint(self, path: str, method: str = None) -> bool:
+        """
+        Verifica si la ruta es un endpoint público externo
+        
+        Args:
+            path: Ruta de la petición
+            method: Método HTTP de la petición
+            
+        Returns:
+            True si es un endpoint público externo
+        """
+        return self.get_public_endpoint_config(path, method) is not None
+    
+    def _method_matches(self, configured_method: str, request_method: str) -> bool:
+        """
+        Verifica si el método HTTP de la petición coincide con el configurado
+        
+        Args:
+            configured_method: Método configurado en el endpoint
+            request_method: Método HTTP de la petición
+            
+        Returns:
+            True si el método coincide
+        """
+        # Si no se provee método (compatibilidad con llamadas antiguas/tests), considerar como coincidencia
+        if not request_method:
+            return True
+        
+        # Si está configurado como 'ALL', acepta cualquier método
+        if configured_method == 'ALL':
+            return True
+        
+        # Comparación exacta (case insensitive)
+        return configured_method.upper() == request_method.upper()
+    
+    def _prepare_request_data(self) -> Tuple[Optional[Dict], Optional[Dict]]:
+        """
+        Prepara los datos de la petición para reenviar, manejando diferentes tipos de contenido
+        
+        Returns:
+            Tuple (request_data, files) donde:
+            - request_data: Datos a enviar (dict, bytes, o None)
+            - files: Archivos a enviar (dict o None)
+        """
+        from flask import request
+        
+        request_data = None
+        files = None
+        
+        # Verificar si es JSON
+        if request.is_json:
+            request_data = request.get_json()
+        
+        # Verificar si es form-data o multipart
+        elif request.form or request.files:
+            # Preparar datos de formulario
+            form_data = {}
+            files_data = {}
+            
+            # Procesar campos de formulario
+            for key, value in request.form.items():
+                form_data[key] = value
+            
+            # Procesar archivos
+            for key, file in request.files.items():
+                if file and file.filename:
+                    # Para multipart/form-data, usar el objeto file directamente
+                    # requests manejará la lectura del archivo automáticamente
+                    files_data[key] = (file.filename, file.stream, file.content_type or 'application/octet-stream')
+            
+            if files_data:
+                # Si hay archivos, usar files y data por separado
+                files = files_data
+                request_data = form_data if form_data else None
+            else:
+                # Si solo hay form-data sin archivos, convertir a JSON
+                request_data = form_data
+        
+        # Verificar si hay datos raw
+        elif request.data:
+            request_data = request.data
+        
+        return request_data, files
+    
+    def forward_public_request(self, endpoint_config: Dict, path: str) -> Tuple[Dict, int]:
+        """
+        Redirige la petición pública al servicio de destino (sin autenticación)
+        
+        Args:
+            endpoint_config: Configuración del endpoint público
+            path: Ruta específica después del endpoint base
+            
+        Returns:
+            Tuple (response_data, status_code)
+        """
+        try:
+            target_url = endpoint_config['target_url']
+            method = request.method
+            
+            # Construir URL completa
+            if path and path != '/':
+                full_url = f"{target_url.rstrip('/')}/{path.lstrip('/')}"
+            else:
+                full_url = target_url
+            
+            # Preparar headers (sin información de usuario)
+            headers = dict(request.headers)
+            
+            # Remover headers que no deben ser reenviados
+            headers_to_remove = ['Host', 'Content-Length', 'Content-Type']
+            for header in headers_to_remove:
+                headers.pop(header, None)
+            
+            # Preparar datos de la petición
+            request_data, files = self._prepare_request_data()
+            
+            # Log para debugging
+            logger.info(f"Forwarding public request: {method} {full_url}")
+            logger.info(f"Request data: {request_data}")
+            logger.info(f"Files: {files}")
+            logger.info(f"Is JSON: {request.is_json}")
+            logger.info(f"Content-Type: {request.content_type}")
+            logger.info(f"Form data: {dict(request.form)}")
+            logger.info(f"Files in request: {list(request.files.keys())}")
+            logger.info(f"Headers being sent: {headers}")
+            
+            # Determinar si enviar como JSON o form-data (asegurar booleano)
+            is_json_request = bool(request.is_json or (not files and request_data is not None))
+            logger.info(f"Is JSON request: {is_json_request}")
+            
+            # Realizar petición al servicio de destino
+            response = requests.request(
+                method=method,
+                url=full_url,
+                headers=headers,
+                json=request_data if is_json_request else None,
+                data=request_data if not is_json_request else None,
+                files=files if files else None,
+                params=request.args,
+                timeout=30
+            )
+            
+            # Preparar respuesta
+            response_data = {}
+            try:
+                response_data = response.json()
+            except ValueError:
+                response_data = {'data': response.text}
+            
+            logger.info(f"Public Authorizer: {method} {full_url} -> {response.status_code}")
+            try:
+                resp_headers = (
+                    dict(response.headers)
+                    if hasattr(response, 'headers') and hasattr(response.headers, 'items')
+                    else {}
+                )
+                logger.info(f"Response headers: {resp_headers}")
+            except Exception:
+                logger.info("Response headers: <unavailable>")
+            logger.info(f"Response data: {response_data}")
+            
+            return response_data, response.status_code
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout al conectar con {target_url}")
+            return {
+                'error': 'Timeout del servicio de destino',
+                'message': 'El servicio no respondió en el tiempo esperado'
+            }, 504
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Error de conexión con {target_url}")
+            return {
+                'error': 'Servicio no disponible',
+                'message': 'No se pudo conectar con el servicio de destino'
+            }, 503
+            
+        except Exception as e:
+            logger.error(f"Error inesperado en autorizador público: {e}")
+            return {
+                'error': 'Error interno del autorizador',
+                'message': 'Error inesperado al procesar la petición'
+            }, 500
     
     # Métodos de autenticación con Keycloak
     def get_public_key(self, kid: str = None) -> Optional[str]:

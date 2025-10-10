@@ -71,6 +71,18 @@ Sistema de autorización que actúa como proxy/gateway para validar tokens JWT d
    python app.py
    ```
 
+### Pruebas unitarias
+
+1. Correr pruebas unitarias con coverage:
+   ```bash
+   coverage run -m unittest discover -s tests
+   ```
+
+1. Ver reporte de cobertura de las pruebas unitarias
+   ```bash
+   coverage report
+   ```
+
 ### Con Docker
 
 1. Construir y ejecutar:

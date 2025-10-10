@@ -58,3 +58,12 @@ def configure_routes(app):
         dynamic_view = type(class_name, (AuthorizerView,), {})
         # Usar un patrón que capture cualquier ruta que comience con el endpoint
         api.add_resource(dynamic_view, f"{endpoint_path}", f"{endpoint_path}/<path:path>")
+    
+    # Endpoints públicos externos - captura todas las rutas públicas configuradas
+    public_external_endpoints = app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
+    for i, endpoint_path in enumerate(public_external_endpoints.keys()):
+        # Crear una clase dinámica para cada endpoint público para evitar conflictos
+        class_name = f"PublicAuthorizerView{i}"
+        dynamic_view = type(class_name, (AuthorizerView,), {})
+        # Usar un patrón que capture cualquier ruta que comience con el endpoint
+        api.add_resource(dynamic_view, f"{endpoint_path}", f"{endpoint_path}/<path:path>")

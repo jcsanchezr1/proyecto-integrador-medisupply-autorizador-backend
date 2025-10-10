@@ -26,8 +26,36 @@ class AuthorizerView(Resource):
             # Obtener la ruta completa
             full_path = request.path
             
-            # Obtener configuración del endpoint
-            endpoint_config = self.authorizer_service.get_endpoint_config(full_path)
+            # PRIMERO: Verificar si es un endpoint seguro (con autenticación)
+            endpoint_config = self.authorizer_service.get_endpoint_config(full_path, request.method)
+            
+            if endpoint_config:
+                # Es un endpoint seguro, requiere autenticación
+                # La lógica de autenticación continúa más abajo
+                pass
+            else:
+                # SEGUNDO: Si no es seguro, verificar si es un endpoint público
+                public_endpoint_config = self.authorizer_service.get_public_endpoint_config(full_path, request.method)
+                
+                if public_endpoint_config:
+                    # Es un endpoint público, redirigir sin autenticación
+                    endpoint_path = None
+                    from flask import current_app
+                    public_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
+                    # Seleccionar la coincidencia de prefijo más larga
+                    matched_prefix = ''
+                    for configured_path in public_endpoints.keys():
+                        if full_path.startswith(configured_path) and len(configured_path) > len(matched_prefix):
+                            matched_prefix = configured_path
+                    if matched_prefix:
+                        endpoint_path = full_path[len(matched_prefix):]
+                    
+                    # Redirigir la petición al servicio de destino (sin autenticación)
+                    response_data, status_code = self.authorizer_service.forward_public_request(
+                        public_endpoint_config, endpoint_path or ''
+                    )
+                    
+                    return response_data, status_code
             
             if not endpoint_config:
                 return {
@@ -84,14 +112,16 @@ class AuthorizerView(Resource):
                 g.user = self.authorizer_service.get_user_info(token_payload)
                 g.token_payload = token_payload
             
-            # Extraer la ruta específica después del endpoint base
+            # Extraer la ruta específica después del endpoint base usando prefijo más largo
             endpoint_path = None
             from flask import current_app
             secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
+            matched_prefix = ''
             for configured_path in secured_endpoints.keys():
-                if full_path.startswith(configured_path):
-                    endpoint_path = full_path[len(configured_path):]
-                    break
+                if full_path.startswith(configured_path) and len(configured_path) > len(matched_prefix):
+                    matched_prefix = configured_path
+            if matched_prefix:
+                endpoint_path = full_path[len(matched_prefix):]
             
             # Redirigir la petición al servicio de destino
             response_data, status_code = self.authorizer_service.forward_request(

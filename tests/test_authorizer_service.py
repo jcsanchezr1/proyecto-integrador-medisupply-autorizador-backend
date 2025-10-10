@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from app.services.authorizer_service import AuthorizerService
+from io import BytesIO
 
 
 class TestAuthorizerService(unittest.TestCase):
@@ -23,6 +24,7 @@ class TestAuthorizerService(unittest.TestCase):
         from app import create_app
         self.app = create_app()
         self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
         
         with self.app.app_context():
             self.service = AuthorizerService()
@@ -303,6 +305,116 @@ class TestAuthorizerService(unittest.TestCase):
         with self.app.app_context():
             result = self.service.get_endpoint_config('/unknown')
             self.assertIsNone(result)
+
+    def test_get_endpoint_config_with_method_match(self):
+        """get_endpoint_config debe respetar el método HTTP cuando se provee."""
+        with self.app.app_context():
+            # En settings, '/auth/user' está configurado para GET en seguros
+            result_get = self.service.get_endpoint_config('/auth/user', method='GET')
+            result_post = self.service.get_endpoint_config('/auth/user', method='POST')
+            self.assertIsNotNone(result_get)
+            self.assertIsNone(result_post)
+
+    def test_get_public_endpoint_config_with_method(self):
+        """get_public_endpoint_config debe respetar el método HTTP público."""
+        with self.app.app_context():
+            # En settings, '/auth/user' está configurado como público para POST
+            pub_post = self.service.get_public_endpoint_config('/auth/user', method='POST')
+            pub_get = self.service.get_public_endpoint_config('/auth/user', method='GET')
+            self.assertIsNotNone(pub_post)
+            self.assertIsNone(pub_get)
+
+    def test_is_authorizer_endpoint_with_method_and_without(self):
+        """is_authorizer_endpoint debe funcionar con y sin método (compat)."""
+        with self.app.app_context():
+            self.assertTrue(self.service.is_authorizer_endpoint('/pokemon'))
+            self.assertTrue(self.service.is_authorizer_endpoint('/pokemon', method='GET'))
+            self.assertFalse(self.service.is_authorizer_endpoint('/unknown'))
+
+    def test_prepare_request_data_json(self):
+        """_prepare_request_data debe extraer JSON correctamente."""
+        with self.app.test_request_context('/any', method='POST', json={'a': 1, 'b': 'x'}):
+            data, files = self.service._prepare_request_data()
+            self.assertEqual(data, {'a': 1, 'b': 'x'})
+            self.assertIsNone(files)
+
+        # También debe escoger enviar como JSON en forward_public_request cuando no hay files
+        with self.app.test_request_context('/any', method='POST', json={'a': 1}):
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                resp, code = self.service.forward_public_request({'target_url': 'http://t'}, '')
+                self.assertEqual(code, 200)
+                # Verificar que se llamó con json no None y data None
+                kwargs = mock_req.call_args.kwargs
+                self.assertIsNotNone(kwargs.get('json'))
+                self.assertIsNone(kwargs.get('data'))
+
+    def test_prepare_request_data_form_urlencoded_without_files(self):
+        """Form sin archivos debe tratarse como JSON en el reenvío."""
+        with self.app.test_request_context('/any', method='POST', data={'x': '1', 'y': '2'}, content_type='application/x-www-form-urlencoded'):
+            data, files = self.service._prepare_request_data()
+            self.assertEqual(data, {'x': '1', 'y': '2'})
+            self.assertIsNone(files)
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                resp, code = self.service.forward_public_request({'target_url': 'http://t'}, '')
+                self.assertEqual(code, 200)
+                kwargs = mock_req.call_args.kwargs
+                # Como no hay files, debe enviarse como json
+                self.assertIsNotNone(kwargs.get('json'))
+                self.assertIsNone(kwargs.get('files'))
+
+    def test_prepare_request_data_multipart_with_file(self):
+        """Multipart con archivo debe enviar files y data (form) al destino."""
+        file_content = BytesIO(b'mock-bytes')
+        environ = self.app.test_request_context(
+            '/any', method='POST',
+            data={'name': 'inst', 'logo': (file_content, 'logo.jpg')},
+            content_type='multipart/form-data'
+        )
+        with environ:
+            data, files = self.service._prepare_request_data()
+            self.assertEqual(data, {'name': 'inst'})
+            self.assertIsNotNone(files)
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                resp, code = self.service.forward_public_request({'target_url': 'http://t'}, '')
+                self.assertEqual(code, 200)
+                kwargs = mock_req.call_args.kwargs
+                # Debe enviar files y data
+                self.assertIsNotNone(kwargs.get('files'))
+                self.assertIsNotNone(kwargs.get('data'))
+
+    def test_forward_request_url_building(self):
+        """forward_request debe construir correctamente la URL con path y sin duplicar /."""
+        with self.app.test_request_context('/auth/user/all', method='DELETE'):
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                # Caso base sin path extra
+                resp, code = self.service.forward_request({'target_url': 'http://api/auth/user/all'}, '')
+                self.assertEqual(code, 200)
+                called_url = mock_req.call_args.kwargs.get('url')
+                self.assertEqual(called_url, 'http://api/auth/user/all')
+
+        with self.app.test_request_context('/auth/user/extra', method='GET'):
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                resp, code = self.service.forward_request({'target_url': 'http://api/auth/user'}, 'extra')
+                self.assertEqual(code, 200)
+                called_url = mock_req.call_args.kwargs.get('url')
+                self.assertEqual(called_url, 'http://api/auth/user/extra')
+
+    def test_forward_request_removes_problematic_headers(self):
+        """Debe remover Host, Content-Length y Content-Type al reenviar."""
+        with self.app.test_request_context('/any', method='POST', headers={'Host': 'localhost', 'Content-Length': '10', 'Content-Type': 'application/json'}, json={'a': 1}):
+            with patch('app.services.authorizer_service.requests.request') as mock_req:
+                mock_req.return_value = Mock(status_code=200, json=lambda: {'ok': True})
+                resp, code = self.service.forward_request({'target_url': 'http://api/t'}, '')
+                self.assertEqual(code, 200)
+                headers_sent = mock_req.call_args.kwargs.get('headers')
+                self.assertNotIn('Host', headers_sent)
+                self.assertNotIn('Content-Length', headers_sent)
+                self.assertNotIn('Content-Type', headers_sent)
 
 
 if __name__ == '__main__':
