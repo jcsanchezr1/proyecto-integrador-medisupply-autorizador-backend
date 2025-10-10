@@ -138,13 +138,64 @@ class TestAuthorizerEndpoints(unittest.TestCase):
     
     def test_pokemon_endpoint_supports_all_http_methods(self):
         """Prueba que el endpoint /pokemon soporta todos los métodos HTTP"""
-        methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+        methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
         
         for method in methods:
             with self.subTest(method=method):
                 response = self.client.open('/pokemon', method=method)
                 # Debería retornar 401 (sin auth) en lugar de 405 (método no permitido)
                 self.assertIn(response.status_code, [401, 404])
+    
+    def test_pokemon_endpoint_options_returns_cors_headers(self):
+        """Prueba que el endpoint /pokemon maneja OPTIONS con headers CORS"""
+        response = self.client.options('/pokemon')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), '')
+        
+        # Verificar headers CORS
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
+        self.assertIn('GET, POST, PUT, DELETE, PATCH, OPTIONS', response.headers.get('Access-Control-Allow-Methods'))
+        self.assertIn('Content-Type', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertIn('Authorization', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertEqual(response.headers.get('Access-Control-Max-Age'), '3600')
+    
+    def test_auth_token_endpoint_options_returns_cors_headers(self):
+        """Prueba que el endpoint /auth/token maneja OPTIONS con headers CORS"""
+        response = self.client.options('/auth/token')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), '')
+        
+        # Verificar headers CORS
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
+        self.assertIn('GET, POST, PUT, DELETE, PATCH, OPTIONS', response.headers.get('Access-Control-Allow-Methods'))
+        self.assertIn('Content-Type', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertIn('Authorization', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertEqual(response.headers.get('Access-Control-Max-Age'), '3600')
+    
+    def test_auth_ping_endpoint_options_returns_cors_headers(self):
+        """Prueba que el endpoint /auth/ping maneja OPTIONS con headers CORS"""
+        response = self.client.options('/auth/ping')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_data(as_text=True), '')
+        
+        # Verificar headers CORS
+        self.assertEqual(response.headers.get('Access-Control-Allow-Origin'), '*')
+        self.assertIn('GET, POST, PUT, DELETE, PATCH, OPTIONS', response.headers.get('Access-Control-Allow-Methods'))
+        self.assertIn('Content-Type', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertIn('Authorization', response.headers.get('Access-Control-Allow-Headers'))
+        self.assertEqual(response.headers.get('Access-Control-Max-Age'), '3600')
+    
+    def test_unknown_endpoint_options_returns_404(self):
+        """Prueba que un endpoint desconocido retorna 404 para OPTIONS"""
+        response = self.client.options('/unknown')
+        
+        self.assertEqual(response.status_code, 404)
+        data = response.get_json()
+        self.assertIn('error', data)
+        self.assertIn('Endpoint no encontrado', data['error'])
 
 
 if __name__ == '__main__':

@@ -15,6 +15,60 @@ class AuthorizerView(Resource):
     def __init__(self):
         self.authorizer_service = AuthorizerService()
     
+    def _handle_options_request(self, full_path: str):
+        """
+        Maneja peticiones OPTIONS (CORS Preflight) para endpoints externos
+        
+        Args:
+            full_path: Ruta completa de la petición
+            
+        Returns:
+            Respuesta OPTIONS con headers CORS apropiados
+        """
+        from flask import current_app, make_response
+        
+        # Verificar si es un endpoint seguro configurado
+        secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
+        public_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
+        
+        # Buscar coincidencia en endpoints seguros
+        matched_secured = None
+        for endpoint_path in secured_endpoints.keys():
+            if full_path.startswith(endpoint_path):
+                matched_secured = endpoint_path
+                break
+        
+        # Buscar coincidencia en endpoints públicos
+        matched_public = None
+        for endpoint_path in public_endpoints.keys():
+            if full_path.startswith(endpoint_path):
+                matched_public = endpoint_path
+                break
+        
+        # Si no hay coincidencia, devolver 404
+        if not matched_secured and not matched_public:
+            return {
+                'error': 'Endpoint no encontrado',
+                'message': f'La ruta {full_path} no está configurada'
+            }, 404
+        
+        # Crear respuesta OPTIONS con headers CORS
+        response = make_response('', 200)
+        
+        # Headers CORS estándar
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, PATCH, OPTIONS'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+        response.headers['Access-Control-Max-Age'] = '3600'
+        
+        # Si hay headers específicos en la petición, incluirlos en la respuesta
+        requested_headers = request.headers.get('Access-Control-Request-Headers')
+        if requested_headers:
+            response.headers['Access-Control-Allow-Headers'] = requested_headers
+        
+        logger.info(f"OPTIONS request handled for {full_path}")
+        return response
+    
     def _handle_request(self, path: str = None):
         """
         Maneja cualquier petición HTTP al autorizador
@@ -25,6 +79,10 @@ class AuthorizerView(Resource):
         try:
             # Obtener la ruta completa
             full_path = request.path
+            
+            # MANEJO ESPECIAL PARA OPTIONS (CORS Preflight)
+            if request.method == 'OPTIONS':
+                return self._handle_options_request(full_path)
             
             # PRIMERO: Verificar si es un endpoint seguro (con autenticación)
             endpoint_config = self.authorizer_service.get_endpoint_config(full_path, request.method)
