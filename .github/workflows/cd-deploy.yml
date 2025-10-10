@@ -19,6 +19,10 @@ env:
   KEYCLOAK_CLIENT_ID: ${{ vars.KEYCLOAK_CLIENT_ID }}
   AUTHENTICATOR_SERVICE_URL: ${{ vars.AUTHENTICATOR_SERVICE_URL }}
 
+  # Configuración de la imagen
+  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_LATEST: latest
+
 jobs:
   build-and-deploy:
     name: Build and Deploy to Cloud Run
