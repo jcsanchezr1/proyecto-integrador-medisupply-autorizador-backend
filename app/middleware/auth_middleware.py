@@ -31,29 +31,56 @@ class AuthMiddleware:
         if request.path in config.PUBLIC_ENDPOINTS:
             return None
         
-        # PRIMERO: Verificar si es un endpoint seguro (con autenticación)
+        # Obtener configuraciones de endpoints
         secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
-        for endpoint_path, endpoint_config in secured_endpoints.items():
-            if request.path.startswith(endpoint_path):
-                # Verificar si el método HTTP coincide (incluyendo OPTIONS)
-                configured_method = endpoint_config.get('method', 'ALL')
-                if (configured_method == 'ALL' or 
-                    configured_method.upper() == request.method.upper() or 
-                    request.method == 'OPTIONS'):
-                    # Si es un endpoint seguro, la validación se hace en el controlador
-                    return None
-        
-        # SEGUNDO: Verificar si es un endpoint público externo (sin autenticación)
         public_external_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
+        
+        # Buscar el mejor match (prefijo más largo) en ambos diccionarios
+        best_secured_match = None
+        best_secured_length = 0
+        best_public_match = None
+        best_public_length = 0
+        
+        # Buscar coincidencia en endpoints públicos externos
         for endpoint_path, endpoint_config in public_external_endpoints.items():
             if request.path.startswith(endpoint_path):
-                # Verificar si el método HTTP coincide (incluyendo OPTIONS)
+                # Verificar si el método HTTP coincide
                 configured_method = endpoint_config.get('method', 'ALL')
                 if (configured_method == 'ALL' or 
                     configured_method.upper() == request.method.upper() or 
                     request.method == 'OPTIONS'):
-                    # Si es un endpoint público externo, la redirección se hace en el controlador
-                    return None
+                    # Guardar el match más largo
+                    if len(endpoint_path) > best_public_length:
+                        best_public_match = endpoint_path
+                        best_public_length = len(endpoint_path)
+        
+        # Buscar coincidencia en endpoints seguros
+        for endpoint_path, endpoint_config in secured_endpoints.items():
+            if request.path.startswith(endpoint_path):
+                # Verificar si el método HTTP coincide
+                configured_method = endpoint_config.get('method', 'ALL')
+                if (configured_method == 'ALL' or 
+                    configured_method.upper() == request.method.upper() or 
+                    request.method == 'OPTIONS'):
+                    # Guardar el match más largo
+                    if len(endpoint_path) > best_secured_length:
+                        best_secured_match = endpoint_path
+                        best_secured_length = len(endpoint_path)
+        
+        # Priorizar el match más largo (más específico)
+        # Si ambos tienen match, el más largo gana
+        if best_public_length > best_secured_length:
+            # Es un endpoint público externo (sin autenticación)
+            logger.info(f"Endpoint público: {request.method} {request.path}")
+            return None
+        elif best_secured_match:
+            # Es un endpoint seguro (con autenticación)
+            logger.info(f"Endpoint seguro: {request.method} {request.path}")
+            return None
+        elif best_public_match:
+            # Es un endpoint público externo (sin autenticación)
+            logger.info(f"Endpoint público: {request.method} {request.path}")
+            return None
         
         # Para cualquier otro endpoint, devolver 404
         logger.warning(f"Endpoint no encontrado: {request.method} {request.path}")
