@@ -30,16 +30,13 @@ class Config:
     PUBLIC_ENDPOINTS = ['/authorizer/ping']
     
     # Variables de entorno para URLs de servicios
-    POKEMON_SERVICE_URL = os.getenv('POKEMON_SERVICE_URL', 'https://pokeapi.co')
     AUTHENTICATOR_SERVICE_URL = os.getenv('AUTHENTICATOR_SERVICE_URL', 'https://medisupply-authenticator-ms-1034901101791.us-central1.run.app')
+    INVENTORIES_SERVICE_URL = os.getenv('INVENTORIES_SERVICE_URL', 'https://medisupply-inventory-ms-1034901101791.us-central1.run.app')
+    PROVIDERS_SERVICE_URL = os.getenv('PROVIDERS_SERVICE_URL', 'https://medisupply-provider-ms-1034901101791.us-central1.run.app')
+    ORDERS_SERVICE_URL = os.getenv('ORDERS_SERVICE_URL', 'https://medisupply-order-ms-1034901101791.us-central1.run.app')
     
     # Configuración de endpoints seguros (Autorizador)
     SECURED_ENDPOINTS = {
-        '/pokemon': {
-            'target_url': f"{POKEMON_SERVICE_URL}/api/v2/pokemon",
-            'method': 'ALL',  # ALL significa todos los métodos HTTP
-            'required_roles': ['Administrador']
-        },
         '/auth/admin/users': {
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/admin/users",
             'method': 'POST',
@@ -54,6 +51,36 @@ class Config:
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/user/all",
             'method': 'DELETE',
             'required_roles': ['Administrador']
+        },
+        '/inventory/products': {
+            'target_url': f"{INVENTORIES_SERVICE_URL}/inventory/products",
+            'method': 'ALL',
+            'required_roles': ['Administrador', 'Compras']
+        },
+        '/inventory/providers/products': {
+            'target_url': f"{INVENTORIES_SERVICE_URL}/inventory/providers/products",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas', 'Cliente']
+        },
+        '/providers': {
+            'target_url': f"{PROVIDERS_SERVICE_URL}/providers",
+            'method': 'ALL',
+            'required_roles': ['Administrador', 'Compras']
+        },
+        '/providers/all': {
+            'target_url': f"{PROVIDERS_SERVICE_URL}/providers/all",
+            'method': 'DELETE',
+            'required_roles': ['Administrador', 'Compras']
+        },
+        '/orders': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas', 'Cliente']
+        },
+        '/orders/delete-all': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/delete-all",
+            'method': 'DELETE',
+            'required_roles': ['Administrador', 'Ventas', 'Cliente']
         }
     }
     
@@ -74,6 +101,18 @@ class Config:
         '/auth/logout': {
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/logout",
             'method': 'POST'
+        },
+        '/inventory/ping': {
+            'target_url': f"{INVENTORIES_SERVICE_URL}/inventory/ping",
+            'method': 'GET'
+        },
+        '/providers/ping': {
+            'target_url': f"{PROVIDERS_SERVICE_URL}/providers/ping",
+            'method': 'GET'
+        },
+        '/orders/ping': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/ping",
+            'method': 'GET'
         }
     }
 
