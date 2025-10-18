@@ -38,7 +38,7 @@ class TestAuthMiddleware(unittest.TestCase):
     
     def test_secured_endpoint_with_options_passes_middleware(self):
         """Prueba que los endpoints seguros con OPTIONS pasan por el middleware"""
-        response = self.client.options('/pokemon')
+        response = self.client.options('/inventory/products')
         
         # OPTIONS en endpoint seguro debe pasar por el middleware
         self.assertEqual(response.status_code, 200)
@@ -72,7 +72,7 @@ class TestAuthMiddleware(unittest.TestCase):
     
     def test_secured_endpoint_with_get_passes_middleware(self):
         """Prueba que endpoints seguros con GET pasan por el middleware"""
-        response = self.client.get('/pokemon')
+        response = self.client.get('/inventory/products')
         
         # GET en endpoint seguro debe pasar por el middleware (retornará 401 por falta de auth)
         self.assertEqual(response.status_code, 401)
@@ -88,7 +88,7 @@ class TestAuthMiddleware(unittest.TestCase):
     def test_middleware_handles_all_http_methods_for_configured_endpoints(self):
         """Prueba que el middleware maneja todos los métodos HTTP para endpoints configurados"""
         methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
-        endpoints = ['/pokemon', '/auth/token', '/auth/ping']
+        endpoints = ['/inventory/products', '/auth/token', '/auth/ping']
         
         for endpoint in endpoints:
             for method in methods:
@@ -126,7 +126,7 @@ class TestAuthMiddleware(unittest.TestCase):
     
     def test_middleware_before_request_returns_none_for_configured_endpoints(self):
         """Prueba que before_request retorna None para endpoints configurados"""
-        with self.app.test_request_context('/pokemon'):
+        with self.app.test_request_context('/inventory/products'):
             result = self.middleware.before_request()
             
             # Debería retornar None para permitir que continúe el procesamiento

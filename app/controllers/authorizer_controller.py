@@ -84,38 +84,65 @@ class AuthorizerView(Resource):
             if request.method == 'OPTIONS':
                 return self._handle_options_request(full_path)
             
-            # PRIMERO: Verificar si es un endpoint seguro (con autenticación)
-            endpoint_config = self.authorizer_service.get_endpoint_config(full_path, request.method)
+            # Obtener configuraciones de endpoints
+            from flask import current_app
+            secured_endpoints = current_app.config.get('SECURED_ENDPOINTS', {})
+            public_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
             
-            if endpoint_config:
-                # Es un endpoint seguro, requiere autenticación
-                # La lógica de autenticación continúa más abajo
-                pass
-            else:
-                # SEGUNDO: Si no es seguro, verificar si es un endpoint público
-                public_endpoint_config = self.authorizer_service.get_public_endpoint_config(full_path, request.method)
+            # Buscar el mejor match (prefijo más largo) en ambos diccionarios
+            best_secured_match = None
+            best_secured_length = 0
+            best_public_match = None
+            best_public_length = 0
+            
+            # Buscar coincidencia en endpoints públicos
+            for endpoint_path in public_endpoints.keys():
+                if full_path.startswith(endpoint_path):
+                    public_config = public_endpoints[endpoint_path]
+                    configured_method = public_config.get('method', 'ALL')
+                    if (configured_method == 'ALL' or 
+                        configured_method.upper() == request.method.upper()):
+                        if len(endpoint_path) > best_public_length:
+                            best_public_match = endpoint_path
+                            best_public_length = len(endpoint_path)
+            
+            # Buscar coincidencia en endpoints seguros
+            for endpoint_path in secured_endpoints.keys():
+                if full_path.startswith(endpoint_path):
+                    secured_config = secured_endpoints[endpoint_path]
+                    configured_method = secured_config.get('method', 'ALL')
+                    if (configured_method == 'ALL' or 
+                        configured_method.upper() == request.method.upper()):
+                        if len(endpoint_path) > best_secured_length:
+                            best_secured_match = endpoint_path
+                            best_secured_length = len(endpoint_path)
+            
+            # Priorizar el match más largo (más específico)
+            if best_public_length > best_secured_length:
+                # Es un endpoint público, redirigir sin autenticación
+                public_endpoint_config = public_endpoints[best_public_match]
+                endpoint_path = full_path[len(best_public_match):]
                 
-                if public_endpoint_config:
-                    # Es un endpoint público, redirigir sin autenticación
-                    endpoint_path = None
-                    from flask import current_app
-                    public_endpoints = current_app.config.get('PUBLIC_EXTERNAL_ENDPOINTS', {})
-                    # Seleccionar la coincidencia de prefijo más larga
-                    matched_prefix = ''
-                    for configured_path in public_endpoints.keys():
-                        if full_path.startswith(configured_path) and len(configured_path) > len(matched_prefix):
-                            matched_prefix = configured_path
-                    if matched_prefix:
-                        endpoint_path = full_path[len(matched_prefix):]
-                    
-                    # Redirigir la petición al servicio de destino (sin autenticación)
-                    response_data, status_code = self.authorizer_service.forward_public_request(
-                        public_endpoint_config, endpoint_path or ''
-                    )
-                    
-                    return response_data, status_code
-            
-            if not endpoint_config:
+                response_data, status_code = self.authorizer_service.forward_public_request(
+                    public_endpoint_config, endpoint_path or ''
+                )
+                
+                return response_data, status_code
+            elif best_secured_match:
+                # Es un endpoint seguro, continuar con autenticación
+                endpoint_config = secured_endpoints[best_secured_match]
+            elif best_public_match:
+                # Es un endpoint público, redirigir sin autenticación
+                public_endpoint_config = public_endpoints[best_public_match]
+                endpoint_path = full_path[len(best_public_match):]
+                
+                response_data, status_code = self.authorizer_service.forward_public_request(
+                    public_endpoint_config, endpoint_path or ''
+                )
+                
+                return response_data, status_code
+            else:
+                # No hay match, endpoint no encontrado
                 return {
                     'error': 'Endpoint no encontrado',
                     'message': f'La ruta {full_path} no está configurada en el autorizador'

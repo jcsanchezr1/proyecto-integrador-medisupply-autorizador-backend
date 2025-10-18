@@ -52,8 +52,8 @@ class TestAuthorizerEndpoints(unittest.TestCase):
     @patch('app.services.authorizer_service.AuthorizerService.get_user_roles')
     @patch('app.services.authorizer_service.AuthorizerService.validate_request')
     @patch('app.services.authorizer_service.AuthorizerService.forward_request')
-    def test_pokemon_endpoint_with_valid_token_and_roles(self, mock_forward, mock_validate_request, mock_get_roles, mock_validate_token):
-        """Prueba que el endpoint /pokemon funciona con token válido y roles correctos"""
+    def test_inventory_products_endpoint_with_valid_token_and_roles(self, mock_forward, mock_validate_request, mock_get_roles, mock_validate_token):
+        """Prueba que el endpoint /inventory/products funciona con token válido y roles correctos"""
         # Configurar mocks
         mock_validate_token.return_value = {
             'sub': 'user123',
@@ -62,27 +62,27 @@ class TestAuthorizerEndpoints(unittest.TestCase):
         }
         mock_get_roles.return_value = ['Administrador']
         mock_validate_request.return_value = (True, "")
-        mock_forward.return_value = ({'name': 'pikachu'}, 200)
+        mock_forward.return_value = ({'products': []}, 200)
         
         # Hacer petición
-        response = self.client.get('/pokemon', headers={'Authorization': 'Bearer valid_token'})
+        response = self.client.get('/inventory/products', headers={'Authorization': 'Bearer valid_token'})
         
         # Verificar resultado
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {'name': 'pikachu'})
+        self.assertEqual(response.get_json(), {'products': []})
     
-    def test_pokemon_endpoint_without_auth_header_returns_401(self):
-        """Prueba que el endpoint /pokemon retorna 401 sin header de Authorization"""
-        response = self.client.get('/pokemon')
+    def test_inventory_products_endpoint_without_auth_header_returns_401(self):
+        """Prueba que el endpoint /inventory/products retorna 401 sin header de Authorization"""
+        response = self.client.get('/inventory/products')
         
         self.assertEqual(response.status_code, 401)
         data = response.get_json()
         self.assertIn('error', data)
         self.assertIn('No autorizado', data['error'])
     
-    def test_pokemon_endpoint_with_invalid_auth_format_returns_401(self):
-        """Prueba que el endpoint /pokemon retorna 401 con formato de header inválido"""
-        response = self.client.get('/pokemon', headers={'Authorization': 'InvalidFormat token123'})
+    def test_inventory_products_endpoint_with_invalid_auth_format_returns_401(self):
+        """Prueba que el endpoint /inventory/products retorna 401 con formato de header inválido"""
+        response = self.client.get('/inventory/products', headers={'Authorization': 'InvalidFormat token123'})
         
         self.assertEqual(response.status_code, 401)
         data = response.get_json()
@@ -90,13 +90,13 @@ class TestAuthorizerEndpoints(unittest.TestCase):
         self.assertIn('Formato de token inválido', data['error'])
     
     @patch('app.services.authorizer_service.AuthorizerService.validate_token')
-    def test_pokemon_endpoint_with_invalid_token_returns_401(self, mock_validate_token):
-        """Prueba que el endpoint /pokemon retorna 401 con token inválido"""
+    def test_inventory_products_endpoint_with_invalid_token_returns_401(self, mock_validate_token):
+        """Prueba que el endpoint /inventory/products retorna 401 con token inválido"""
         # Configurar mock
         mock_validate_token.return_value = None
         
         # Hacer petición
-        response = self.client.get('/pokemon', headers={'Authorization': 'Bearer invalid_token'})
+        response = self.client.get('/inventory/products', headers={'Authorization': 'Bearer invalid_token'})
         
         # Verificar resultado
         self.assertEqual(response.status_code, 401)
@@ -107,8 +107,8 @@ class TestAuthorizerEndpoints(unittest.TestCase):
     @patch('app.services.authorizer_service.AuthorizerService.validate_token')
     @patch('app.services.authorizer_service.AuthorizerService.get_user_roles')
     @patch('app.services.authorizer_service.AuthorizerService.validate_request')
-    def test_pokemon_endpoint_with_valid_token_but_insufficient_roles_returns_403(self, mock_validate_request, mock_get_roles, mock_validate_token):
-        """Prueba que el endpoint /pokemon retorna 403 con token válido pero sin roles suficientes"""
+    def test_inventory_products_endpoint_with_valid_token_but_insufficient_roles_returns_403(self, mock_validate_request, mock_get_roles, mock_validate_token):
+        """Prueba que el endpoint /inventory/products retorna 403 con token válido pero sin roles suficientes"""
         # Configurar mocks
         mock_validate_token.return_value = {
             'sub': 'user123',
@@ -116,10 +116,10 @@ class TestAuthorizerEndpoints(unittest.TestCase):
             'realm_access': {'roles': ['Usuario']}
         }
         mock_get_roles.return_value = ['Usuario']
-        mock_validate_request.return_value = (False, "Acceso denegado. Roles requeridos: Administrador")
+        mock_validate_request.return_value = (False, "Acceso denegado. Roles requeridos: Administrador, Compras")
         
         # Hacer petición
-        response = self.client.get('/pokemon', headers={'Authorization': 'Bearer valid_token'})
+        response = self.client.get('/inventory/products', headers={'Authorization': 'Bearer valid_token'})
         
         # Verificar resultado
         self.assertEqual(response.status_code, 403)
@@ -136,19 +136,19 @@ class TestAuthorizerEndpoints(unittest.TestCase):
         self.assertIn('error', data)
         self.assertIn('Endpoint no encontrado', data['error'])
     
-    def test_pokemon_endpoint_supports_all_http_methods(self):
-        """Prueba que el endpoint /pokemon soporta todos los métodos HTTP"""
+    def test_inventory_products_endpoint_supports_all_http_methods(self):
+        """Prueba que el endpoint /inventory/products soporta todos los métodos HTTP"""
         methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
         
         for method in methods:
             with self.subTest(method=method):
-                response = self.client.open('/pokemon', method=method)
+                response = self.client.open('/inventory/products', method=method)
                 # Debería retornar 401 (sin auth) en lugar de 405 (método no permitido)
                 self.assertIn(response.status_code, [401, 404])
     
-    def test_pokemon_endpoint_options_returns_cors_headers(self):
-        """Prueba que el endpoint /pokemon maneja OPTIONS con headers CORS"""
-        response = self.client.options('/pokemon')
+    def test_inventory_products_endpoint_options_returns_cors_headers(self):
+        """Prueba que el endpoint /inventory/products maneja OPTIONS con headers CORS"""
+        response = self.client.options('/inventory/products')
         
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_data(as_text=True), '')
