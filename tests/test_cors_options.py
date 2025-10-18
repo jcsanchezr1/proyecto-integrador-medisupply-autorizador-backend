@@ -23,7 +23,7 @@ class TestCorsOptions(unittest.TestCase):
     
     def test_cors_headers_present_in_all_responses(self):
         """Prueba que los headers CORS están presentes en todas las respuestas"""
-        endpoints = ['/authorizer/ping', '/pokemon', '/auth/token', '/auth/ping']
+        endpoints = ['/authorizer/ping', '/inventory/products', '/auth/token', '/auth/ping']
         
         for endpoint in endpoints:
             with self.subTest(endpoint=endpoint):
@@ -33,7 +33,7 @@ class TestCorsOptions(unittest.TestCase):
     
     def test_options_secured_endpoints_return_200_with_cors(self):
         """Prueba que OPTIONS en endpoints seguros retorna 200 con headers CORS"""
-        secured_endpoints = ['/pokemon', '/auth/admin/users', '/auth/user', '/auth/user/all']
+        secured_endpoints = ['/inventory/products', '/auth/admin/users', '/auth/user', '/auth/user/all']
         
         for endpoint in secured_endpoints:
             with self.subTest(endpoint=endpoint):

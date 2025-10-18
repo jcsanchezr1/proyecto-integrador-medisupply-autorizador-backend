@@ -53,7 +53,7 @@ class TestAppCreation(unittest.TestCase):
         
         self.assertIn('SECURED_ENDPOINTS', app.config)
         self.assertIsInstance(app.config['SECURED_ENDPOINTS'], dict)
-        self.assertIn('/pokemon', app.config['SECURED_ENDPOINTS'])
+        self.assertIn('/inventory/products', app.config['SECURED_ENDPOINTS'])
     
     def test_app_has_public_endpoints_config(self):
         """Prueba que la aplicación tiene configuración de endpoints públicos"""

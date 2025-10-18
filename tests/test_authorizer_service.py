@@ -167,7 +167,7 @@ class TestAuthorizerService(unittest.TestCase):
     def test_is_authorizer_endpoint_with_valid_endpoint(self):
         """Prueba que is_authorizer_endpoint retorna True para endpoints configurados"""
         with self.app.app_context():
-            result = self.service.is_authorizer_endpoint('/pokemon')
+            result = self.service.is_authorizer_endpoint('/inventory/products')
             self.assertTrue(result)
     
     def test_is_authorizer_endpoint_with_invalid_endpoint(self):
@@ -293,14 +293,14 @@ class TestAuthorizerService(unittest.TestCase):
     def test_get_endpoint_config_exact_match(self):
         """Prueba que get_endpoint_config encuentra coincidencias exactas"""
         with self.app.app_context():
-            result = self.service.get_endpoint_config('/pokemon')
+            result = self.service.get_endpoint_config('/inventory/products')
             self.assertIsNotNone(result)
             self.assertIn('target_url', result)
     
     def test_get_endpoint_config_prefix_match(self):
         """Prueba que get_endpoint_config encuentra coincidencias por prefijo"""
         with self.app.app_context():
-            result = self.service.get_endpoint_config('/pokemon/1')
+            result = self.service.get_endpoint_config('/inventory/products/1')
             self.assertIsNotNone(result)
             self.assertIn('target_url', result)
     
@@ -331,8 +331,8 @@ class TestAuthorizerService(unittest.TestCase):
     def test_is_authorizer_endpoint_with_method_and_without(self):
         """is_authorizer_endpoint debe funcionar con y sin método (compat)."""
         with self.app.app_context():
-            self.assertTrue(self.service.is_authorizer_endpoint('/pokemon'))
-            self.assertTrue(self.service.is_authorizer_endpoint('/pokemon', method='GET'))
+            self.assertTrue(self.service.is_authorizer_endpoint('/inventory/products'))
+            self.assertTrue(self.service.is_authorizer_endpoint('/inventory/products', method='GET'))
             self.assertFalse(self.service.is_authorizer_endpoint('/unknown'))
 
     def test_prepare_request_data_json(self):
