@@ -148,5 +148,4 @@ Para desplegar en Google Cloud Run:
    ```
 
 ## Logs
-
 La aplicación registra todas las peticiones y validaciones en los logs para facilitar el debugging.
