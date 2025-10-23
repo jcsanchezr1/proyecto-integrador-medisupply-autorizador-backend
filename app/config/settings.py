@@ -77,6 +77,11 @@ class Config:
             'method': 'GET',
             'required_roles': ['Administrador', 'Ventas', 'Cliente']
         },
+        '/orders/create': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/create",
+            'method': 'POST',
+            'required_roles': ['Administrador', 'Ventas', 'Cliente']
+        },
         '/orders/delete-all': {
             'target_url': f"{ORDERS_SERVICE_URL}/orders/delete-all",
             'method': 'DELETE',
