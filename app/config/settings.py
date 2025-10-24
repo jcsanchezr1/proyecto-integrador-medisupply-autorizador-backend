@@ -55,7 +55,7 @@ class Config:
         '/inventory/products': {
             'target_url': f"{INVENTORIES_SERVICE_URL}/inventory/products",
             'method': 'ALL',
-            'required_roles': ['Administrador', 'Compras']
+            'required_roles': ['Administrador', 'Compras', 'Logistica']
         },
         '/inventory/providers/products': {
             'target_url': f"{INVENTORIES_SERVICE_URL}/inventory/providers/products",
