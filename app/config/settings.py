@@ -86,6 +86,11 @@ class Config:
             'target_url': f"{ORDERS_SERVICE_URL}/orders/delete-all",
             'method': 'DELETE',
             'required_roles': ['Administrador', 'Ventas', 'Cliente']
+        },
+        '/auth/assigned-clients': {
+            'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/assigned-clients",
+            'method': 'ALL',
+            'required_roles': ['Administrador', 'Ventas']
         }
     }
     
