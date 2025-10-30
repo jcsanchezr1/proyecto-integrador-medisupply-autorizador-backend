@@ -34,6 +34,7 @@ class Config:
     INVENTORIES_SERVICE_URL = os.getenv('INVENTORIES_SERVICE_URL', 'https://medisupply-inventory-ms-1034901101791.us-central1.run.app')
     PROVIDERS_SERVICE_URL = os.getenv('PROVIDERS_SERVICE_URL', 'https://medisupply-provider-ms-1034901101791.us-central1.run.app')
     ORDERS_SERVICE_URL = os.getenv('ORDERS_SERVICE_URL', 'https://medisupply-order-ms-1034901101791.us-central1.run.app')
+    SALES_PLAN_SERVICE_URL = os.getenv('SALES_PLAN_SERVICE_URL', 'https://medisupply-sales-plan-ms-1034901101791.us-central1.run.app')
     
     # Configuración de endpoints seguros (Autorizador)
     SECURED_ENDPOINTS = {
@@ -91,6 +92,21 @@ class Config:
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/assigned-clients",
             'method': 'ALL',
             'required_roles': ['Administrador', 'Ventas']
+        },
+        '/sales-plan': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/sales-plan",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/sales-plan/create': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/sales-plan/create",
+            'method': 'POST',
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/sales-plan/delete-all': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/sales-plan/delete-all",
+            'method': 'DELETE',
+            'required_roles': ['Administrador', 'Ventas']
         }
     }
     
@@ -103,6 +119,10 @@ class Config:
         '/auth/user': {
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/user",
             'method': 'POST'
+        },
+        '/auth/user/get': {
+            'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/user",
+            'method': 'GET'
         },
         '/auth/token': {
             'target_url': f"{AUTHENTICATOR_SERVICE_URL}/auth/token",
@@ -122,6 +142,10 @@ class Config:
         },
         '/orders/ping': {
             'target_url': f"{ORDERS_SERVICE_URL}/orders/ping",
+            'method': 'GET'
+        },
+        '/sales-plan/ping': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/sales-plan/ping",
             'method': 'GET'
         }
     }
