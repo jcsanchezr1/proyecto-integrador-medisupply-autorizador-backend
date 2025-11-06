@@ -146,6 +146,6 @@ Para desplegar en Google Cloud Run:
      --allow-unauthenticated \
      --set-env-vars KEYCLOAK_SERVER_URL=https://your-keycloak.com,KEYCLOAK_REALM=medisupply-realm,KEYCLOAK_CLIENT_ID=medisupply-app
    ```
-
+   
 ## Logs
 La aplicación registra todas las peticiones y validaciones en los logs para facilitar el debugging.
