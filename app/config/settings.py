@@ -113,6 +113,11 @@ class Config:
             'target_url': f"{LOGISTICS_SERVICE_URL}/logistics/routes",
             'method': 'ALL',
             'required_roles': ['Administrador', 'Logistica']
+        },
+        '/sellers': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/sellers",
+            'method': 'ALL',
+            'required_roles': ['Administrador', 'Ventas']
         }
     }
     
