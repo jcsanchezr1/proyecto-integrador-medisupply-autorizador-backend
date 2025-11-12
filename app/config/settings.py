@@ -74,10 +74,20 @@ class Config:
             'method': 'DELETE',
             'required_roles': ['Administrador', 'Compras']
         },
-        '/orders': {
-            'target_url': f"{ORDERS_SERVICE_URL}/orders",
+        '/orders/reports/monthly': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/reports/monthly",
             'method': 'GET',
-            'required_roles': ['Administrador', 'Ventas', 'Cliente']
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/orders/reports/top-clients': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/reports/top-clients",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/orders/reports/top-products': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/reports/top-products",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
         },
         '/orders/create': {
             'target_url': f"{ORDERS_SERVICE_URL}/orders/create",
@@ -87,6 +97,11 @@ class Config:
         '/orders/delete-all': {
             'target_url': f"{ORDERS_SERVICE_URL}/orders/delete-all",
             'method': 'DELETE',
+            'required_roles': ['Administrador', 'Ventas', 'Cliente']
+        },
+        '/orders': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders",
+            'method': 'GET',
             'required_roles': ['Administrador', 'Ventas', 'Cliente']
         },
         '/auth/assigned-clients': {
