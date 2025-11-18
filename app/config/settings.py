@@ -74,6 +74,21 @@ class Config:
             'method': 'DELETE',
             'required_roles': ['Administrador', 'Compras']
         },
+        '/orders/informes/seller/status-summary': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/informes/seller/status-summary",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/orders/informes/seller/clients-summary': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/informes/seller/clients-summary",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
+        },
+        '/orders/informes/seller/monthly': {
+            'target_url': f"{ORDERS_SERVICE_URL}/orders/informes/seller/monthly",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
+        },
         '/orders/reports/monthly': {
             'target_url': f"{ORDERS_SERVICE_URL}/orders/reports/monthly",
             'method': 'GET',
