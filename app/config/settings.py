@@ -148,6 +148,11 @@ class Config:
             'target_url': f"{SALES_PLAN_SERVICE_URL}/sellers",
             'method': 'ALL',
             'required_roles': ['Administrador', 'Ventas']
+        },
+        '/videos-processed': {
+            'target_url': f"{SALES_PLAN_SERVICE_URL}/videos-processed",
+            'method': 'GET',
+            'required_roles': ['Administrador', 'Ventas']
         }
     }
     
